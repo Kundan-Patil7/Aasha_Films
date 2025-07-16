@@ -11,19 +11,14 @@ const userAuth = require("../middleware/userAuth");
 
 const router = express.Router();
 
-// Route for user registration
 router.post("/register", registerUser);
 
-// Route for user login
 router.post("/login", loginUser);
 
-// Route to get user profile (protected)
 router.get("/profile", userAuth, getUserProfile);
 
-// Route to create a ticket
 router.post("/createTicket", createTicket);
 
-// Route to update user profile (protected)
 router.put("/profile", userAuth, updateProfile);
 
 module.exports = router;

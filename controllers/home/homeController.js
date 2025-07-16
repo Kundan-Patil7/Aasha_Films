@@ -501,6 +501,99 @@ const updatePrivacyPolicy = async (req, res) => {
   }
 };
 
+const addCategory = async (req, res) => {
+  const { title, talent_count, description, gender } = req.body;
+  const avatar = req.file ? req.file.filename : null;
+
+  if (!avatar || !title || !gender) {
+    return res.status(400).json({ message: "Required fields missing" });
+  }
+
+  try {
+    // ✅ 1. Check if table exists
+    const [tableCheck] = await pool.query(`
+      SELECT COUNT(*) AS count
+      FROM information_schema.tables 
+      WHERE table_schema = DATABASE() 
+      AND table_name = 'popular_categories'
+    `);
+
+    if (tableCheck[0].count === 0) {
+      // ✅ 2. If not exists, create it
+      await pool.query(`
+        CREATE TABLE popular_categories (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          avatar VARCHAR(255) NOT NULL,
+          title VARCHAR(100) NOT NULL,
+          talent_count INT DEFAULT 0,
+          description TEXT,
+          gender ENUM('Male','Male-Female' ,'Female', 'Boy', 'Girl','Boy-Girl') NOT NULL,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
+    }
+
+    // ✅ 3. Insert the data
+    const insertQuery = `
+      INSERT INTO popular_categories (avatar, title, talent_count, description, gender)
+      VALUES (?, ?, ?, ?, ?)
+    `;
+    await pool.query(insertQuery, [
+      avatar,
+      title,
+      talent_count || 0,
+      description,
+      gender,
+    ]);
+    res.status(201).json({ message: "Category added successfully" });
+  } catch (err) {
+    console.error("Add Category Error:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+const getCategories = async (req, res) => {
+  try {
+    const [data] = await pool.query(
+      "SELECT * FROM popular_categories ORDER BY id DESC"
+    );
+    res.status(200).json(data);
+  } catch (err) {
+    console.error("Fetch Categories Error:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+const deleteCategory = async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    // 1. Fetch the avatar file name
+    const [rows] = await pool.query("SELECT avatar FROM popular_categories WHERE id = ?", [id]);
+
+    if (rows.length === 0) {
+      return res.status(404).json({ message: "Category not found" });
+    }
+
+    const avatarFilename = rows[0].avatar;
+    const avatarPath = path.join(__dirname, "../../uploads/categoryImg", avatarFilename);
+
+    // 2. Delete the image from file system
+    if (fs.existsSync(avatarPath)) {
+      fs.unlinkSync(avatarPath);
+    }
+
+    // 3. Delete the record from DB
+    await pool.query("DELETE FROM popular_categories WHERE id = ?", [id]);
+
+    res.status(200).json({ message: "Category and image deleted successfully" });
+
+  } catch (err) {
+    console.error("Delete Category Error:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
 module.exports = {
   getHomeVideo,
   getBanners,
@@ -512,4 +605,7 @@ module.exports = {
   updatePrivacyPolicy,
   updateBanner,
   updateAboutUs,
+  addCategory,
+  getCategories,
+  deleteCategory,
 };
