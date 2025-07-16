@@ -569,14 +569,21 @@ const deleteCategory = async (req, res) => {
 
   try {
     // 1. Fetch the avatar file name
-    const [rows] = await pool.query("SELECT avatar FROM popular_categories WHERE id = ?", [id]);
+    const [rows] = await pool.query(
+      "SELECT avatar FROM popular_categories WHERE id = ?",
+      [id]
+    );
 
     if (rows.length === 0) {
       return res.status(404).json({ message: "Category not found" });
     }
 
     const avatarFilename = rows[0].avatar;
-    const avatarPath = path.join(__dirname, "../../uploads/categoryImg", avatarFilename);
+    const avatarPath = path.join(
+      __dirname,
+      "../../uploads/categoryImg",
+      avatarFilename
+    );
 
     // 2. Delete the image from file system
     if (fs.existsSync(avatarPath)) {
@@ -586,10 +593,267 @@ const deleteCategory = async (req, res) => {
     // 3. Delete the record from DB
     await pool.query("DELETE FROM popular_categories WHERE id = ?", [id]);
 
-    res.status(200).json({ message: "Category and image deleted successfully" });
-
+    res
+      .status(200)
+      .json({ message: "Category and image deleted successfully" });
   } catch (err) {
     console.error("Delete Category Error:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+const addFeaturedTalent = async (req, res) => {
+  const {
+    name,
+    gender,
+    age,
+    location,
+    height,
+    hair_color,
+    shoe_size,
+    eye_color,
+  } = req.body;
+  const profile_img = req.file ? req.file.filename : null;
+
+  if (!name || !gender || !profile_img) {
+    return res.status(400).json({ message: "Required fields missing" });
+  }
+
+  try {
+    // 1. Check if featured_talents table exists
+    const [talentTable] = await pool.query(`
+      SELECT COUNT(*) AS count
+      FROM information_schema.tables
+      WHERE table_schema = DATABASE()
+      AND table_name = 'featured_talents'
+    `);
+
+    if (talentTable[0].count === 0) {
+      await pool.query(`
+        CREATE TABLE featured_talents (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          name VARCHAR(100) NOT NULL,
+          gender ENUM('Male', 'Female', 'Boy', 'Girl') NOT NULL,
+          age INT,
+          location VARCHAR(100),
+          height VARCHAR(50),
+          hair_color VARCHAR(50),
+          shoe_size VARCHAR(50),
+          eye_color VARCHAR(50),
+          profile_img VARCHAR(255),
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
+    }
+
+    // 2. Check if react table exists
+    const [reactTable] = await pool.query(`
+      SELECT COUNT(*) AS count
+      FROM information_schema.tables
+      WHERE table_schema = DATABASE()
+      AND table_name = 'react'
+    `);
+
+    if (reactTable[0].count === 0) {
+      await pool.query(`
+        CREATE TABLE react (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          info TEXT,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
+    }
+
+    // 3. Insert featured talent
+    const insertQuery = `
+      INSERT INTO featured_talents 
+      (name, gender, age, location, height, hair_color, shoe_size, eye_color, profile_img)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `;
+    await pool.query(insertQuery, [
+      name,
+      gender,
+      age,
+      location,
+      height,
+      hair_color,
+      shoe_size,
+      eye_color,
+      profile_img,
+    ]);
+
+    // Optional: Add entry to react log
+    await pool.query("INSERT INTO react (info) VALUES (?)", [
+      `Added featured talent: ${name}`,
+    ]);
+
+    res.status(201).json({ message: "Featured talent added successfully" });
+  } catch (err) {
+    console.error("Add Talent Error:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+// ✅ Get all Featured Talents
+const getFeaturedTalents = async (req, res) => {
+  try {
+    const [data] = await pool.query(
+      "SELECT * FROM featured_talents ORDER BY id DESC"
+    );
+    res.status(200).json(data);
+  } catch (err) {
+    console.error("Fetch Talents Error:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+// ✅ Delete Featured Talent + Cleanup image
+const deleteFeaturedTalent = async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const [rows] = await pool.query(
+      "SELECT profile_img FROM featured_talents WHERE id = ?",
+      [id]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({ message: "Talent not found" });
+    }
+
+    const profileImg = rows[0].profile_img;
+    const folderPath = path.join(__dirname, "../../uploads/featuredImg/");
+    const fullImgPath = path.join(folderPath, profileImg);
+
+    // 1. Delete talent from DB
+    await pool.query("DELETE FROM featured_talents WHERE id = ?", [id]);
+
+    // 2. Delete image file
+    if (fs.existsSync(fullImgPath)) {
+      fs.unlinkSync(fullImgPath);
+    }
+
+    // 3. Clean orphaned images in folder
+    const [usedImages] = await pool.query(
+      "SELECT profile_img FROM featured_talents"
+    );
+    const usedFilenames = usedImages.map((item) => item.profile_img);
+
+    fs.readdirSync(folderPath).forEach((file) => {
+      if (!usedFilenames.includes(file)) {
+        const filePath = path.join(folderPath, file);
+        fs.unlinkSync(filePath);
+        console.log(`Deleted orphan image: ${file}`);
+      }
+    });
+
+    // Optional: log in react table
+    await pool.query("INSERT INTO react (info) VALUES (?)", [
+      `Deleted featured talent ID: ${id}`,
+    ]);
+
+    res.status(200).json({ message: "Talent and image deleted successfully" });
+  } catch (err) {
+    console.error("Delete Talent Error:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+const addTestimonial = async (req, res) => {
+  const { name, description, them } = req.body;
+  const avatar = req.file ? req.file.filename : null;
+
+  if (!name || !description || !avatar) {
+    return res.status(400).json({ message: "Required fields missing" });
+  }
+
+  try {
+    // 1. Check if table 'testimonials' exists
+    const [tableCheck] = await pool.query(`
+      SELECT COUNT(*) AS count
+      FROM information_schema.tables
+      WHERE table_schema = DATABASE()
+      AND table_name = 'testimonials'
+    `);
+
+    // 2. Create if not exists
+    if (tableCheck[0].count === 0) {
+      await pool.query(`
+        CREATE TABLE testimonials (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          name VARCHAR(100) NOT NULL,
+          description TEXT NOT NULL,
+          avatar VARCHAR(255) NOT NULL,
+          them TINYINT(1) DEFAULT 1,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
+    }
+
+    // 3. Insert testimonial
+    const insertQuery = `
+      INSERT INTO testimonials (name, description, avatar, them)
+      VALUES (?, ?, ?, ?)
+    `;
+    await pool.query(insertQuery, [name, description, avatar, them || 1]);
+
+    res.status(201).json({ message: "Testimonial added successfully" });
+  } catch (err) {
+    console.error("Add Testimonial Error:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+// ✅ Get All Testimonials
+const getTestimonials = async (req, res) => {
+  try {
+    const [data] = await pool.query("SELECT * FROM testimonials ORDER BY id DESC");
+    res.status(200).json(data);
+  } catch (err) {
+    console.error("Fetch Testimonials Error:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+// ✅ Delete Testimonial + Remove avatar + Cleanup orphan images
+const deleteTestimonial = async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    // 1. Get the avatar filename
+    const [rows] = await pool.query("SELECT avatar FROM testimonials WHERE id = ?", [id]);
+
+    if (rows.length === 0) {
+      return res.status(404).json({ message: "Testimonial not found" });
+    }
+
+    const avatar = rows[0].avatar;
+    const folderPath = path.join(__dirname, "../../uploads/testimonialsImg/");
+    const avatarPath = path.join(folderPath, avatar);
+
+    // 2. Delete record from DB
+    await pool.query("DELETE FROM testimonials WHERE id = ?", [id]);
+
+    // 3. Delete image file
+    if (fs.existsSync(avatarPath)) {
+      fs.unlinkSync(avatarPath);
+    }
+
+    // 4. Clean orphaned images
+    const [usedAvatars] = await pool.query("SELECT avatar FROM testimonials");
+    const usedFilenames = usedAvatars.map(row => row.avatar);
+
+    fs.readdirSync(folderPath).forEach(file => {
+      if (!usedFilenames.includes(file)) {
+        const filePath = path.join(folderPath, file);
+        fs.unlinkSync(filePath);
+        console.log("Deleted orphan image:", file);
+      }
+    });
+
+    res.status(200).json({ message: "Testimonial and image deleted successfully" });
+  } catch (err) {
+    console.error("Delete Testimonial Error:", err);
     res.status(500).json({ message: "Server error" });
   }
 };
@@ -608,4 +872,10 @@ module.exports = {
   addCategory,
   getCategories,
   deleteCategory,
+  deleteFeaturedTalent,
+  getFeaturedTalents,
+  addFeaturedTalent,
+  addTestimonial,
+  getTestimonials,
+  deleteTestimonial,
 };

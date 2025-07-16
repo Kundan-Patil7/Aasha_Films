@@ -16,12 +16,20 @@ const {
   addCategory,
   getCategories,
   deleteCategory,
+  addFeaturedTalent,
+  getFeaturedTalents,
+  deleteFeaturedTalent,
+  addTestimonial,
+  getTestimonials,
+  deleteTestimonial,
 } = require("../controllers/home/homeController");
 
 // Middleware
 const uploadHomeVideo = require("../middleware/uploadHomeVideo");
 const { bannerUpload } = require("../middleware/bannerUpload");
 const uploadAvatar = require("../middleware/categoryMiddleware");
+const uploadFeaturedImg = require("../middleware/uploadFeaturedImg");
+const uploadTestimonialImg = require("../middleware/testimonialImg");
 
 // GET Routes
 router.get("/about-us", getAboutUs);
@@ -39,10 +47,23 @@ router.put("/banner/:id", bannerUpload.single("banner"), updateBanner);
 
 router.put("/about-us", updateAboutUs);
 
-//------------------------new --------------------------------
+//-------------------new --------------------------------
 
-router.post("/add", uploadAvatar, addCategory);
-router.get("/all", getCategories);
-router.delete("/delete/:id", deleteCategory);
+router.post("/add-category", uploadAvatar, addCategory);
+router.get("/all-category", getCategories);
+router.delete("/delete-category/:id", deleteCategory);
+
+//------------------new----------------------------------
+
+router.post("/add-featured", uploadFeaturedImg, addFeaturedTalent);
+router.get("/all-featured", getFeaturedTalents);
+router.delete("/delete-featured/:id", deleteFeaturedTalent);
+
+//------------------new -------------------------------------
+router.post("/add-testimonial", uploadTestimonialImg, addTestimonial);
+router.get("/all-testimonial", getTestimonials);
+router.delete("/delete-testimonial/:id", deleteTestimonial);
+
+
 
 module.exports = router;
