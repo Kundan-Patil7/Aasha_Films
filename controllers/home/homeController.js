@@ -1,17 +1,32 @@
+/**
+ * Home Page Content Management Controller
+ * Handles operations for home video, banners, about us, terms, and privacy policy
+ */
+
 const express = require("express");
 const pool = require("../../config/database");
 const path = require("path");
+const fs = require("fs");
 
-/* ------------------------------------------------- */
-/*  GET  /api/home‑video                             */
-/* ------------------------------------------------- */
+// Helper function to remove file if it exists
+function removeIfExists(filePath) {
+  if (fs.existsSync(filePath)) {
+    try {
+      fs.unlinkSync(filePath);
+    } catch (err) {
+      console.error(`Error deleting file ${filePath}:`, err);
+    }
+  }
+}
+
+const uploadDir = path.join(process.cwd(), "uploads", "HomeVideo");
+const bannerDir = path.join(process.cwd(), "uploads", "banners");
+
+// Home Video Operations
 const getHomeVideo = async (req, res) => {
   try {
     const [[videoRow] = []] = await pool.query(
-      `SELECT video_path,
-              updated_at AS updatedAt
-         FROM homeVideo
-        WHERE id = ?`,
+      `SELECT video_path, updated_at AS updatedAt FROM homeVideo WHERE id = ?`,
       [1]
     );
 
@@ -22,7 +37,6 @@ const getHomeVideo = async (req, res) => {
       });
     }
 
-    // 🔗 absolute URL → http(s)://host/uploads/HomeVideo/filename.mp4
     const videoUrl = `${req.protocol}://${req.get("host")}/uploads/HomeVideo/${
       videoRow.video_path
     }`;
@@ -46,17 +60,81 @@ const getHomeVideo = async (req, res) => {
   }
 };
 
-/* ------------------------------------------------- */
-/*  GET  /api/banners                                */
-/* ------------------------------------------------- */
+async function initHomeVideoTable() {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS homeVideo (
+      id          INT PRIMARY KEY AUTO_INCREMENT,
+      video_path  VARCHAR(255) DEFAULT NULL,
+      created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    )
+  `);
+
+  const [rows] = await pool.query("SELECT id FROM homeVideo WHERE id = 1");
+  if (rows.length === 0) {
+    await pool.query("INSERT INTO homeVideo (id, video_path) VALUES (1, NULL)");
+  }
+}
+
+const updateHomeVideo = async (req, res) => {
+  let tempFilePath = req.file ? req.file.path : null;
+  const videoId = parseInt(req.params.id, 10) || 1;
+
+  try {
+    await initHomeVideoTable();
+
+    if (!req.file) {
+      return res.status(400).json({ error: "No video uploaded." });
+    }
+
+    const [[record] = []] = await pool.query(
+      "SELECT video_path FROM homeVideo WHERE id = ?",
+      [videoId]
+    );
+
+    if (!record) {
+      return res.status(404).json({ error: `Row id ${videoId} not found.` });
+    }
+
+    if (record.video_path) {
+      const oldPath = path.isAbsolute(record.video_path)
+        ? record.video_path
+        : path.join(uploadDir, record.video_path);
+      if (oldPath !== tempFilePath) removeIfExists(oldPath);
+    }
+
+    const newFilename = req.file.filename;
+    await pool.query("UPDATE homeVideo SET video_path = ? WHERE id = ?", [
+      newFilename,
+      videoId,
+    ]);
+
+    tempFilePath = null;
+    return res.json({
+      message: `Video for id ${videoId} updated successfully 🎉`,
+      file: newFilename,
+    });
+  } catch (err) {
+    console.error("updateHomeVideo error →", err);
+    if (tempFilePath && fs.existsSync(tempFilePath)) {
+      try {
+        fs.unlinkSync(tempFilePath);
+        console.log("Temp file removed ➜", tempFilePath);
+      } catch (unlinkErr) {
+        console.error("Failed to delete temp file ➜", unlinkErr);
+      }
+    }
+    return res
+      .status(500)
+      .json({ error: "Server error. Upload rolled back, file deleted." });
+  }
+};
+
+// Banner Operations
 const getBanners = async (req, res) => {
   try {
     const [rows] = await pool.query(
-      `SELECT id,
-              image_path,
-              updated_at AS updatedAt
-         FROM banners
-     ORDER BY id ASC`
+      `SELECT id, image_path, updated_at AS updatedAt FROM banners ORDER BY id ASC`
     );
 
     if (rows.length === 0) {
@@ -66,10 +144,7 @@ const getBanners = async (req, res) => {
       });
     }
 
-    // 🌐 Base URL for all banner images
     const baseUrl = `${req.protocol}://${req.get("host")}/uploads/banners/`;
-
-    // Map DB rows → clean objects with full URL
     const banners = rows.map((b) => ({
       id: b.id,
       filename: b.image_path,
@@ -92,6 +167,72 @@ const getBanners = async (req, res) => {
   }
 };
 
+async function initBannerTable() {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS banners (
+      id INT PRIMARY KEY AUTO_INCREMENT,
+      image_path VARCHAR(255),
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    )
+  `);
+
+  const [rows] = await pool.query("SELECT id FROM banners");
+  const existingIds = rows.map((r) => r.id);
+
+  if (!existingIds.includes(1)) {
+    await pool.query("INSERT INTO banners (id, image_path) VALUES (1, NULL)");
+  }
+  if (!existingIds.includes(2)) {
+    await pool.query("INSERT INTO banners (id, image_path) VALUES (2, NULL)");
+  }
+}
+
+const updateBanner = async (req, res) => {
+  let tempFilePath = req.file ? req.file.path : null;
+  const bannerId = parseInt(req.params.id, 10) || 1;
+
+  try {
+    await initBannerTable();
+
+    if (!req.file) {
+      return res.status(400).json({ error: "No banner uploaded." });
+    }
+
+    const [[record] = []] = await pool.query(
+      "SELECT image_path FROM banners WHERE id = ?",
+      [bannerId]
+    );
+    if (!record) {
+      return res.status(404).json({ error: `Banner ${bannerId} not found.` });
+    }
+
+    if (record.image_path) {
+      const oldPath = path.join(bannerDir, record.image_path);
+      if (oldPath !== tempFilePath) removeIfExists(oldPath);
+    }
+
+    const newFilename = req.file.filename;
+    await pool.query("UPDATE banners SET image_path = ? WHERE id = ?", [
+      newFilename,
+      bannerId,
+    ]);
+
+    tempFilePath = null;
+    return res.json({
+      message: `Banner ${bannerId} updated successfully 🎉`,
+      file: newFilename,
+    });
+  } catch (err) {
+    console.error("Error updating banner:", err);
+    if (tempFilePath && fs.existsSync(tempFilePath)) {
+      fs.unlinkSync(tempFilePath);
+    }
+    return res.status(500).json({ error: "Server error. Upload failed." });
+  }
+};
+
+// About Us Operations
 const getAboutUs = async (req, res) => {
   try {
     const [[row] = []] = await pool.query(
@@ -123,8 +264,252 @@ const getAboutUs = async (req, res) => {
   }
 };
 
+const initAboutUsTable = async () => {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS about_us (
+      id INT PRIMARY KEY AUTO_INCREMENT,
+      html_content LONGTEXT DEFAULT NULL,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    )
+  `);
+
+  const [rows] = await pool.query("SELECT id FROM about_us WHERE id = 1");
+  if (rows.length === 0) {
+    await pool.query(
+      "INSERT INTO about_us (id, html_content) VALUES (1, NULL)"
+    );
+  }
+};
+
+const updateAboutUs = async (req, res) => {
+  const { htmlContent } = req.body;
+
+  if (!htmlContent) {
+    return res.status(400).json({
+      success: false,
+      message: "No HTML content provided",
+    });
+  }
+
+  try {
+    await initAboutUsTable();
+    await pool.query("UPDATE about_us SET html_content = ? WHERE id = 1", [
+      htmlContent,
+    ]);
+
+    res.status(200).json({
+      success: true,
+      message: "About Us content updated successfully ✅",
+    });
+  } catch (err) {
+    console.error("❌ Error updating About Us:", err);
+    res.status(500).json({
+      success: false,
+      message: "Failed to update About Us",
+      error: err.message,
+    });
+  }
+};
+
+// Terms and Conditions Operations
+const initializeTermsTable = async () => {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS terms_and_conditions (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        html_content LONGTEXT NOT NULL,
+        last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+      )
+    `);
+
+    const [result] = await pool.query(
+      `SELECT COUNT(*) AS count FROM terms_and_conditions`
+    );
+    if (result[0].count === 0) {
+      await pool.query(`
+        INSERT INTO terms_and_conditions (html_content) VALUES ('<p>Default Terms and Conditions Content</p>')
+      `);
+      console.log("Default terms and conditions content inserted");
+    }
+  } catch (error) {
+    console.error("Error initializing terms table:", error);
+    throw error;
+  }
+};
+
+const getTermsAndConditions = async (req, res) => {
+  try {
+    const [result] = await pool.query(
+      "SELECT * FROM terms_and_conditions ORDER BY id DESC LIMIT 1"
+    );
+
+    if (result.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "No terms and conditions found",
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      content: result[0].html_content,
+      lastUpdated: result[0].last_updated,
+    });
+  } catch (error) {
+    console.error("Error fetching terms and conditions:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch terms and conditions",
+      error: error.message,
+    });
+  }
+};
+
+const updateTermsAndConditions = async (req, res) => {
+  try {
+    await initializeTermsTable();
+    const { html_content } = req.body;
+
+    if (!html_content) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid content",
+      });
+    }
+
+    const [existing] = await pool.query(
+      "SELECT id FROM terms_and_conditions LIMIT 1"
+    );
+    if (existing.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "No terms found to update",
+      });
+    }
+
+    await pool.query(
+      "UPDATE terms_and_conditions SET html_content = ? WHERE id = ?",
+      [html_content, existing[0].id]
+    );
+
+    res.status(200).json({
+      success: true,
+      message: "Terms and conditions updated successfully",
+    });
+  } catch (error) {
+    console.error("Error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to update terms",
+      error: error.message,
+    });
+  }
+};
+
+// Privacy Policy Operations
+const initializePrivacyTable = async () => {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS privacy_policy (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        html_content LONGTEXT NOT NULL,
+        last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+      )
+    `);
+
+    const [result] = await pool.query(
+      `SELECT COUNT(*) AS count FROM privacy_policy`
+    );
+    if (result[0].count === 0) {
+      await pool.query(`
+        INSERT INTO privacy_policy (html_content) VALUES ('<p>Default Privacy Policy Content</p>')
+      `);
+      console.log("Default privacy policy content inserted");
+    }
+  } catch (error) {
+    console.error("Error initializing privacy table:", error);
+    throw error;
+  }
+};
+
+const getPrivacyPolicy = async (req, res) => {
+  try {
+    const [result] = await pool.query(
+      "SELECT * FROM privacy_policy ORDER BY id DESC LIMIT 1"
+    );
+
+    if (result.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "No privacy policy found",
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      content: result[0].html_content,
+      lastUpdated: result[0].last_updated,
+    });
+  } catch (error) {
+    console.error("Error fetching privacy policy:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch privacy policy",
+      error: error.message,
+    });
+  }
+};
+
+const updatePrivacyPolicy = async (req, res) => {
+  try {
+    await initializePrivacyTable();
+    const { html_content } = req.body;
+
+    if (!html_content) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid content",
+      });
+    }
+
+    const [existing] = await pool.query(
+      "SELECT id FROM privacy_policy LIMIT 1"
+    );
+    if (existing.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "No privacy policy found to update",
+      });
+    }
+
+    await pool.query(
+      "UPDATE privacy_policy SET html_content = ? WHERE id = ?",
+      [html_content, existing[0].id]
+    );
+
+    res.status(200).json({
+      success: true,
+      message: "Privacy policy updated successfully",
+    });
+  } catch (error) {
+    console.error("Error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to update privacy policy",
+      error: error.message,
+    });
+  }
+};
+
 module.exports = {
   getHomeVideo,
   getBanners,
   getAboutUs,
+  updateHomeVideo,
+  getTermsAndConditions,
+  getPrivacyPolicy,
+  updateTermsAndConditions,
+  updatePrivacyPolicy,
+  updateBanner,
+  updateAboutUs,
 };
