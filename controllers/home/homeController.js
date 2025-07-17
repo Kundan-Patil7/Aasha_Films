@@ -510,7 +510,7 @@ const addCategory = async (req, res) => {
   }
 
   try {
-    // ✅ 1. Check if table exists
+    // Check if table exists
     const [tableCheck] = await pool.query(`
       SELECT COUNT(*) AS count
       FROM information_schema.tables 
@@ -519,7 +519,7 @@ const addCategory = async (req, res) => {
     `);
 
     if (tableCheck[0].count === 0) {
-      // ✅ 2. If not exists, create it
+      // If not exists, create it
       await pool.query(`
         CREATE TABLE popular_categories (
           id INT AUTO_INCREMENT PRIMARY KEY,
@@ -533,7 +533,7 @@ const addCategory = async (req, res) => {
       `);
     }
 
-    // ✅ 3. Insert the data
+    // Insert the data
     const insertQuery = `
       INSERT INTO popular_categories (avatar, title, talent_count, description, gender)
       VALUES (?, ?, ?, ?, ?)
@@ -545,7 +545,21 @@ const addCategory = async (req, res) => {
       description,
       gender,
     ]);
-    res.status(201).json({ message: "Category added successfully" });
+
+    const categoryUrl = `${req.protocol}://${req.get(
+      "host"
+    )}/uploads/categoryImg/${avatar}`;
+
+    res.status(201).json({
+      message: "Category added successfully",
+      category: {
+        title,
+        talent_count: talent_count || 0,
+        description,
+        gender,
+        avatarUrl: categoryUrl,
+      },
+    });
   } catch (err) {
     console.error("Add Category Error:", err);
     res.status(500).json({ message: "Server error" });
@@ -557,7 +571,14 @@ const getCategories = async (req, res) => {
     const [data] = await pool.query(
       "SELECT * FROM popular_categories ORDER BY id DESC"
     );
-    res.status(200).json(data);
+
+    const baseUrl = `${req.protocol}://${req.get("host")}/uploads/categoryImg/`;
+    const categoriesWithUrls = data.map((category) => ({
+      ...category,
+      avatarUrl: `${baseUrl}${category.avatar}`,
+    }));
+
+    res.status(200).json(categoriesWithUrls);
   } catch (err) {
     console.error("Fetch Categories Error:", err);
     res.status(500).json({ message: "Server error" });
@@ -682,32 +703,54 @@ const addFeaturedTalent = async (req, res) => {
       profile_img,
     ]);
 
+    const talentUrl = `${req.protocol}://${req.get(
+      "host"
+    )}/uploads/featuredImg/${profile_img}`;
+
     // Optional: Add entry to react log
     await pool.query("INSERT INTO react (info) VALUES (?)", [
       `Added featured talent: ${name}`,
     ]);
 
-    res.status(201).json({ message: "Featured talent added successfully" });
+    res.status(201).json({
+      message: "Featured talent added successfully",
+      talent: {
+        name,
+        gender,
+        age,
+        location,
+        height,
+        hair_color,
+        shoe_size,
+        eye_color,
+        profileUrl: talentUrl,
+      },
+    });
   } catch (err) {
     console.error("Add Talent Error:", err);
     res.status(500).json({ message: "Server error" });
   }
 };
 
-// ✅ Get all Featured Talents
 const getFeaturedTalents = async (req, res) => {
   try {
     const [data] = await pool.query(
       "SELECT * FROM featured_talents ORDER BY id DESC"
     );
-    res.status(200).json(data);
+
+    const baseUrl = `${req.protocol}://${req.get("host")}/uploads/featuredImg/`;
+    const talentsWithUrls = data.map((talent) => ({
+      ...talent,
+      profileUrl: `${baseUrl}${talent.profile_img}`,
+    }));
+
+    res.status(200).json(talentsWithUrls);
   } catch (err) {
     console.error("Fetch Talents Error:", err);
     res.status(500).json({ message: "Server error" });
   }
 };
 
-// ✅ Delete Featured Talent + Cleanup image
 const deleteFeaturedTalent = async (req, res) => {
   const { id } = req.params;
 
@@ -797,31 +840,55 @@ const addTestimonial = async (req, res) => {
     `;
     await pool.query(insertQuery, [name, description, avatar, them || 1]);
 
-    res.status(201).json({ message: "Testimonial added successfully" });
+    const testimonialUrl = `${req.protocol}://${req.get(
+      "host"
+    )}/uploads/testimonialsImg/${avatar}`;
+
+    res.status(201).json({
+      message: "Testimonial added successfully",
+      testimonial: {
+        name,
+        description,
+        them: them || 1,
+        avatarUrl: testimonialUrl,
+      },
+    });
   } catch (err) {
     console.error("Add Testimonial Error:", err);
     res.status(500).json({ message: "Server error" });
   }
 };
 
-// ✅ Get All Testimonials
 const getTestimonials = async (req, res) => {
   try {
-    const [data] = await pool.query("SELECT * FROM testimonials ORDER BY id DESC");
-    res.status(200).json(data);
+    const [data] = await pool.query(
+      "SELECT * FROM testimonials ORDER BY id DESC"
+    );
+
+    const baseUrl = `${req.protocol}://${req.get(
+      "host"
+    )}/uploads/testimonialsImg/`;
+    const testimonialsWithUrls = data.map((testimonial) => ({
+      ...testimonial,
+      avatarUrl: `${baseUrl}${testimonial.avatar}`,
+    }));
+
+    res.status(200).json(testimonialsWithUrls);
   } catch (err) {
     console.error("Fetch Testimonials Error:", err);
     res.status(500).json({ message: "Server error" });
   }
 };
 
-// ✅ Delete Testimonial + Remove avatar + Cleanup orphan images
 const deleteTestimonial = async (req, res) => {
   const { id } = req.params;
 
   try {
     // 1. Get the avatar filename
-    const [rows] = await pool.query("SELECT avatar FROM testimonials WHERE id = ?", [id]);
+    const [rows] = await pool.query(
+      "SELECT avatar FROM testimonials WHERE id = ?",
+      [id]
+    );
 
     if (rows.length === 0) {
       return res.status(404).json({ message: "Testimonial not found" });
@@ -841,9 +908,9 @@ const deleteTestimonial = async (req, res) => {
 
     // 4. Clean orphaned images
     const [usedAvatars] = await pool.query("SELECT avatar FROM testimonials");
-    const usedFilenames = usedAvatars.map(row => row.avatar);
+    const usedFilenames = usedAvatars.map((row) => row.avatar);
 
-    fs.readdirSync(folderPath).forEach(file => {
+    fs.readdirSync(folderPath).forEach((file) => {
       if (!usedFilenames.includes(file)) {
         const filePath = path.join(folderPath, file);
         fs.unlinkSync(filePath);
@@ -851,7 +918,9 @@ const deleteTestimonial = async (req, res) => {
       }
     });
 
-    res.status(200).json({ message: "Testimonial and image deleted successfully" });
+    res
+      .status(200)
+      .json({ message: "Testimonial and image deleted successfully" });
   } catch (err) {
     console.error("Delete Testimonial Error:", err);
     res.status(500).json({ message: "Server error" });
