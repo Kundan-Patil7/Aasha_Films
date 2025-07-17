@@ -927,6 +927,91 @@ const deleteTestimonial = async (req, res) => {
   }
 };
 
+// Plan Details Operations
+const initializePlandetailTable = async () => {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS plan_details (
+        id INT PRIMARY KEY AUTO_INCREMENT,
+        heading VARCHAR(255),
+        description LONGTEXT,
+        plan_benefits LONGTEXT,
+        from_whom VARCHAR(255),
+        why_subscribe LONGTEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+      )
+    `);
+
+    const [rows] = await pool.query("SELECT id FROM plan_details WHERE id = 1");
+    if (rows.length === 0) {
+      await pool.query(
+        `INSERT INTO plan_details (id, heading, description, plan_benefits, from_whom, why_subscribe) VALUES (1, NULL, NULL, NULL, NULL, NULL)`
+      );
+      console.log("Default plan_details row inserted.");
+    }
+  } catch (error) {
+    console.error("Error initializing plan_details table:", error);
+    throw error;
+  }
+};
+
+
+
+const getPlandetail = async (req, res) => {
+  try {
+    await initializePlandetailTable();
+    const [[planDetail] = []] = await pool.query(
+      "SELECT heading, description, plan_benefits, from_whom, why_subscribe, updated_at FROM plan_details WHERE id = 1"
+    );
+
+    if (!planDetail) {
+      return res.status(404).json({
+        success: false,
+        message: "No plan details found",
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Plan details fetched successfully",
+      planDetail: planDetail,
+    });
+  } catch (err) {
+    console.error("Fetch Plandetail Error:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+const updatePlandetail = async (req, res) => {
+  const { heading, description, plan_benefits, from_whom, why_subscribe } = req.body;
+
+  if (!heading || !description || !plan_benefits || !from_whom || !why_subscribe) {
+    return res.status(400).json({ message: "All fields (heading, description, plan_benefits, from_whom, why_subscribe) are required for update." });
+  }
+
+  try {
+    // Ensure table and default row (with dummy data if new) exist
+    await initializePlandetailTable(); 
+
+    // No need to check for existing.length === 0 here, because initializePlandetailTable
+    // guarantees that a row with id=1 will exist (either pre-existing or newly inserted
+    // with dummy data).
+    const updateQuery = `
+      UPDATE plan_details
+      SET heading = ?, description = ?, plan_benefits = ?, from_whom = ?, why_subscribe = ?
+      WHERE id = 1
+    `;
+    await pool.query(updateQuery, [heading, description, plan_benefits, from_whom, why_subscribe]);
+
+    res.status(200).json({ message: "Plan details updated successfully" });
+  } catch (err) {
+    console.error("Update Plandetail Error:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+
 module.exports = {
   getHomeVideo,
   getBanners,
@@ -947,4 +1032,7 @@ module.exports = {
   addTestimonial,
   getTestimonials,
   deleteTestimonial,
+   // Added Plandetail controller
+  getPlandetail, // Added Plandetail controller
+  updatePlandetail, // Added Plandetail controller
 };
