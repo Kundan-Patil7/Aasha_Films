@@ -927,7 +927,7 @@ const deleteTestimonial = async (req, res) => {
   }
 };
 
-// Plan Details Operations
+
 const initializePlandetailTable = async () => {
   try {
     await pool.query(`
@@ -955,8 +955,6 @@ const initializePlandetailTable = async () => {
     throw error;
   }
 };
-
-
 
 const getPlandetail = async (req, res) => {
   try {
@@ -1032,7 +1030,6 @@ module.exports = {
   addTestimonial,
   getTestimonials,
   deleteTestimonial,
-   // Added Plandetail controller
-  getPlandetail, // Added Plandetail controller
-  updatePlandetail, // Added Plandetail controller
+  getPlandetail, 
+  updatePlandetail, 
 };

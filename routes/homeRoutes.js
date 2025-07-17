@@ -22,7 +22,6 @@ const {
   addTestimonial,
   getTestimonials,
   deleteTestimonial,
-  
   getPlandetail,
   updatePlandetail,
   
@@ -68,9 +67,10 @@ router.delete("/delete-featured/:id", deleteFeaturedTalent);
 router.post("/add-testimonial", uploadTestimonialImg, addTestimonial);
 router.get("/all-testimonial", getTestimonials);
 router.delete("/delete-testimonial/:id", deleteTestimonial);
+//------------------new----------------------------------------
 
-router.get("/plandetail", getPlandetail);
-router.put("/plandetail", updatePlandetail);
+router.get("/plan-detail", getPlandetail);
+router.put("/plan-detail", updatePlandetail);
 
 
 
