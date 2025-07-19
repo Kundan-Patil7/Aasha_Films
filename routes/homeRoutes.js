@@ -52,23 +52,23 @@ router.put("/about-us", updateAboutUs);
 
 //-------------------work --------------------------------
 
-router.post("/add-category", uploadAvatar, addCategory);
-router.get("/all-category", getCategories);
-router.delete("/delete-category/:id", deleteCategory);
+router.post("category", uploadAvatar, addCategory);
+router.get("/category", getCategories);
+router.delete("/category/:id", deleteCategory);
 
 //------------------Work ----------------------------------
 
-router.post("/add-featured", uploadFeaturedImg, addFeaturedTalent);
-router.get("/all-featured", getFeaturedTalents);
-router.delete("/delete-featured/:id", deleteFeaturedTalent);
+router.post("/featured", uploadFeaturedImg, addFeaturedTalent);
+router.get("/featured", getFeaturedTalents);
+router.delete("/featured/:id", deleteFeaturedTalent);
 
-//------------------work -------------------------------------
+//------------------done -------------------------------------
 router.post("/testimonials", uploadTestimonialImg, addTestimonial);
 router.get("/testimonials", getTestimonials);
 router.delete("/testimonials/:id", deleteTestimonial);
 router.put("/testimonials/:id", uploadTestimonialImg, updateTestimonial);
 
-//------------------new----------------------------------------
+//------------------done ----------------------------------------
 
 router.get("/plan-detail", getPlandetail);
 router.put("/plan-detail", updatePlandetail);
