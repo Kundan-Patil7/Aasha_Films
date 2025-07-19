@@ -24,7 +24,7 @@ const {
   deleteTestimonial,
   getPlandetail,
   updatePlandetail,
-  
+  updateTestimonial,
 } = require("../controllers/home/homeController");
 
 // Middleware
@@ -40,7 +40,6 @@ router.get("/banners", getBanners);
 router.get("/home-video", getHomeVideo);
 router.get("/terms-and-conditions", getTermsAndConditions);
 router.get("/privacy-policy", getPrivacyPolicy);
-
 
 // PUT Routes (Updates)
 router.put("/about-us", updateAboutUs);
@@ -64,15 +63,14 @@ router.get("/all-featured", getFeaturedTalents);
 router.delete("/delete-featured/:id", deleteFeaturedTalent);
 
 //------------------work -------------------------------------
-router.post("/add-testimonial", uploadTestimonialImg, addTestimonial);
-router.get("/all-testimonial", getTestimonials);
-router.delete("/delete-testimonial/:id", deleteTestimonial);
+router.post("/testimonials", uploadTestimonialImg, addTestimonial);
+router.get("/testimonials", getTestimonials);
+router.delete("/testimonials/:id", deleteTestimonial);
+router.put("/testimonials/:id", uploadTestimonialImg, updateTestimonial);
+
 //------------------new----------------------------------------
 
 router.get("/plan-detail", getPlandetail);
 router.put("/plan-detail", updatePlandetail);
-
-//-------------------new----------------------------------------
-
 
 module.exports = router;

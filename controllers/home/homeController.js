@@ -926,6 +926,87 @@ const deleteTestimonial = async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 };
+const updateTestimonial = async (req, res) => {
+  const { id } = req.params;
+  const { name, description, them } = req.body;
+  const avatar = req.file ? req.file.filename : null;
+
+  if (!name || !description) {
+    return res.status(400).json({ message: "Name and description are required" });
+  }
+
+  try {
+    // 1. Check if testimonial exists
+    const [existingTestimonial] = await pool.query(
+      "SELECT avatar FROM testimonials WHERE id = ?",
+      [id]
+    );
+
+    if (existingTestimonial.length === 0) {
+      return res.status(404).json({ message: "Testimonial not found" });
+    }
+
+    // 2. Prepare update data
+    let updateFields = {
+      name,
+      description,
+      them: them || 1,
+    };
+
+    let updateQuery = "UPDATE testimonials SET name = ?, description = ?, them = ?";
+    const queryParams = [name, description, them || 1];
+
+    // 3. Handle avatar update if new file was uploaded
+    if (avatar) {
+      updateQuery += ", avatar = ?";
+      queryParams.push(avatar);
+
+      // Delete old avatar file
+      const oldAvatar = existingTestimonial[0].avatar;
+      const oldAvatarPath = path.join(
+        __dirname,
+        "../../uploads/testimonialsImg/",
+        oldAvatar
+      );
+
+      if (fs.existsSync(oldAvatarPath)) {
+        fs.unlinkSync(oldAvatarPath);
+      }
+    }
+
+    updateQuery += " WHERE id = ?";
+    queryParams.push(id);
+
+    // 4. Execute update
+    await pool.query(updateQuery, queryParams);
+
+    // 5. Prepare response
+    const responseData = {
+      id,
+      name,
+      description,
+      them: them || 1,
+    };
+
+    if (avatar) {
+      responseData.avatarUrl = `${req.protocol}://${req.get(
+        "host"
+      )}/uploads/testimonialsImg/${avatar}`;
+    } else {
+      responseData.avatarUrl = `${req.protocol}://${req.get(
+        "host"
+      )}/uploads/testimonialsImg/${existingTestimonial[0].avatar}`;
+    }
+
+    res.status(200).json({
+      message: "Testimonial updated successfully",
+      testimonial: responseData,
+    });
+  } catch (err) {
+    console.error("Update Testimonial Error:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
 
 const initializePlandetailTable = async () => {
   try {
@@ -1059,4 +1140,5 @@ module.exports = {
   deleteTestimonial,
   getPlandetail,
   updatePlandetail,
+  updateTestimonial
 };
