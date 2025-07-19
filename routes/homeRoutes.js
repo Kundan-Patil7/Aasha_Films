@@ -51,19 +51,19 @@ router.put("/banner/:id", bannerUpload.single("banner"), updateBanner);
 
 router.put("/about-us", updateAboutUs);
 
-//-------------------new --------------------------------
+//-------------------work --------------------------------
 
 router.post("/add-category", uploadAvatar, addCategory);
 router.get("/all-category", getCategories);
 router.delete("/delete-category/:id", deleteCategory);
 
-//------------------new----------------------------------
+//------------------Work ----------------------------------
 
 router.post("/add-featured", uploadFeaturedImg, addFeaturedTalent);
 router.get("/all-featured", getFeaturedTalents);
 router.delete("/delete-featured/:id", deleteFeaturedTalent);
 
-//------------------new -------------------------------------
+//------------------work -------------------------------------
 router.post("/add-testimonial", uploadTestimonialImg, addTestimonial);
 router.get("/all-testimonial", getTestimonials);
 router.delete("/delete-testimonial/:id", deleteTestimonial);
@@ -72,6 +72,7 @@ router.delete("/delete-testimonial/:id", deleteTestimonial);
 router.get("/plan-detail", getPlandetail);
 router.put("/plan-detail", updatePlandetail);
 
+//-------------------new----------------------------------------
 
 
 module.exports = router;

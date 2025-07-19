@@ -927,7 +927,6 @@ const deleteTestimonial = async (req, res) => {
   }
 };
 
-
 const initializePlandetailTable = async () => {
   try {
     await pool.query(`
@@ -938,6 +937,7 @@ const initializePlandetailTable = async () => {
         plan_benefits LONGTEXT,
         from_whom VARCHAR(255),
         why_subscribe LONGTEXT,
+        price INT DEFAULT 0,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
       )
@@ -946,7 +946,8 @@ const initializePlandetailTable = async () => {
     const [rows] = await pool.query("SELECT id FROM plan_details WHERE id = 1");
     if (rows.length === 0) {
       await pool.query(
-        `INSERT INTO plan_details (id, heading, description, plan_benefits, from_whom, why_subscribe) VALUES (1, NULL, NULL, NULL, NULL, NULL)`
+        `INSERT INTO plan_details (id, heading, description, plan_benefits, from_whom, why_subscribe, price) 
+         VALUES (1, NULL, NULL, NULL, NULL, NULL, 0)`
       );
       console.log("Default plan_details row inserted.");
     }
@@ -960,7 +961,7 @@ const getPlandetail = async (req, res) => {
   try {
     await initializePlandetailTable();
     const [[planDetail] = []] = await pool.query(
-      "SELECT heading, description, plan_benefits, from_whom, why_subscribe, updated_at FROM plan_details WHERE id = 1"
+      "SELECT heading, description, plan_benefits, from_whom, why_subscribe, price, updated_at FROM plan_details WHERE id = 1"
     );
 
     if (!planDetail) {
@@ -982,25 +983,52 @@ const getPlandetail = async (req, res) => {
 };
 
 const updatePlandetail = async (req, res) => {
-  const { heading, description, plan_benefits, from_whom, why_subscribe } = req.body;
+  const {
+    heading,
+    description,
+    plan_benefits,
+    from_whom,
+    why_subscribe,
+    price,
+  } = req.body;
 
-  if (!heading || !description || !plan_benefits || !from_whom || !why_subscribe) {
-    return res.status(400).json({ message: "All fields (heading, description, plan_benefits, from_whom, why_subscribe) are required for update." });
+  if (
+    !heading ||
+    !description ||
+    !plan_benefits ||
+    !from_whom ||
+    !why_subscribe ||
+    price === undefined
+  ) {
+    return res.status(400).json({
+      message:
+        "All fields (heading, description, plan_benefits, from_whom, why_subscribe, price) are required for update.",
+    });
+  }
+
+  // Validate price is an integer
+  if (!Number.isInteger(price)) {
+    return res.status(400).json({
+      message: "Price must be an integer value",
+    });
   }
 
   try {
-    // Ensure table and default row (with dummy data if new) exist
-    await initializePlandetailTable(); 
+    await initializePlandetailTable();
 
-    // No need to check for existing.length === 0 here, because initializePlandetailTable
-    // guarantees that a row with id=1 will exist (either pre-existing or newly inserted
-    // with dummy data).
     const updateQuery = `
       UPDATE plan_details
-      SET heading = ?, description = ?, plan_benefits = ?, from_whom = ?, why_subscribe = ?
+      SET heading = ?, description = ?, plan_benefits = ?, from_whom = ?, why_subscribe = ?, price = ?
       WHERE id = 1
     `;
-    await pool.query(updateQuery, [heading, description, plan_benefits, from_whom, why_subscribe]);
+    await pool.query(updateQuery, [
+      heading,
+      description,
+      plan_benefits,
+      from_whom,
+      why_subscribe,
+      price,
+    ]);
 
     res.status(200).json({ message: "Plan details updated successfully" });
   } catch (err) {
@@ -1008,7 +1036,6 @@ const updatePlandetail = async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 };
-
 
 module.exports = {
   getHomeVideo,
@@ -1030,6 +1057,6 @@ module.exports = {
   addTestimonial,
   getTestimonials,
   deleteTestimonial,
-  getPlandetail, 
-  updatePlandetail, 
+  getPlandetail,
+  updatePlandetail,
 };
