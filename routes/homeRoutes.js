@@ -60,7 +60,7 @@ router.delete("/category/:id", deleteCategory);
 
 //------------------Work ----------------------------------
 
-router.post("/featured", uploadFeaturedImg, addFeaturedTalent);
+router.post("/featured", uploadFeaturedImages, addFeaturedTalent);
 router.get("/featured", getFeaturedTalents);
 router.delete("/featured/:id", deleteFeaturedTalent);
 router.put("/featured/:id", uploadFeaturedImages, updateFeaturedTalent);
