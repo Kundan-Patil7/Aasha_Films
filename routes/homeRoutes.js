@@ -3,77 +3,87 @@ const router = express.Router();
 
 // Controllers
 const {
+  // Home Page Content
   getHomeVideo,
-  getBanners,
-  getAboutUs,
   updateHomeVideo,
-  getTermsAndConditions,
-  getPrivacyPolicy,
-  updateTermsAndConditions,
-  updatePrivacyPolicy,
+  getBanners,
   updateBanner,
+  getAboutUs,
   updateAboutUs,
+
+  // Legal Pages
+  getTermsAndConditions,
+  updateTermsAndConditions,
+  getPrivacyPolicy,
+  updatePrivacyPolicy,
+
+  // Categories
   addCategory,
   getCategories,
   deleteCategory,
+  updateCategory,
+
+  // Featured Talents
   addFeaturedTalent,
   getFeaturedTalents,
   deleteFeaturedTalent,
+  updateFeaturedTalent,
+
+  // Testimonials
   addTestimonial,
   getTestimonials,
   deleteTestimonial,
+  updateTestimonial,
+
+  // Plan Details
   getPlandetail,
   updatePlandetail,
-  updateTestimonial,
-  updateFeaturedTalent,
 } = require("../controllers/home/homeController");
 
 // Middleware
 const uploadHomeVideo = require("../middleware/uploadHomeVideo");
 const { bannerUpload } = require("../middleware/bannerUpload");
 const uploadAvatar = require("../middleware/categoryMiddleware");
-// const uploadFeaturedImg = require("../middleware/uploadFeaturedImg");
 const uploadTestimonialImg = require("../middleware/testimonialImg");
 const uploadFeaturedImages = require("../middleware/uploadFeaturedImg");
 
-// GET Routes
-router.get("/about-us", getAboutUs);
-router.get("/banners", getBanners);
+// ------------------- Home Page Content Routes -------------------
 router.get("/home-video", getHomeVideo);
-router.get("/terms-and-conditions", getTermsAndConditions);
-router.get("/privacy-policy", getPrivacyPolicy);
-
-// PUT Routes (Updates)
-router.put("/about-us", updateAboutUs);
-router.put("/terms-and-conditions", updateTermsAndConditions);
-router.put("/privacy-policy", updatePrivacyPolicy);
 router.put("/home-video", uploadHomeVideo, updateHomeVideo);
-router.put("/banner/:id", bannerUpload.single("banner"), updateBanner);
 
+router.get("/banners", getBanners);
+router.put("/banners/:id", bannerUpload.single("banner"), updateBanner);
+
+router.get("/about-us", getAboutUs);
 router.put("/about-us", updateAboutUs);
 
-//-------------------work --------------------------------
+// ------------------- Legal Pages Routes -------------------------
+router.get("/terms-and-conditions", getTermsAndConditions);
+router.put("/terms-and-conditions", updateTermsAndConditions);
 
-router.post("category", uploadAvatar, addCategory);
-router.get("/category", getCategories);
-router.delete("/category/:id", deleteCategory);
+router.get("/privacy-policy", getPrivacyPolicy);
+router.put("/privacy-policy", updatePrivacyPolicy);
 
-//------------------Work ----------------------------------
+// ------------------- Category Routes ---------------------------
+router.post("/categories", uploadAvatar, addCategory);
+router.get("/categories", getCategories);
+router.delete("/categories/:id", deleteCategory);
+router.put("/categories/:id", uploadAvatar, updateCategory);
 
-router.post("/featured", uploadFeaturedImages, addFeaturedTalent);
-router.get("/featured", getFeaturedTalents);
-router.delete("/featured/:id", deleteFeaturedTalent);
-router.put("/featured/:id", uploadFeaturedImages, updateFeaturedTalent);
+// ------------------- Featured Talent Routes --------------------
+router.post("/featured-talents", uploadFeaturedImages, addFeaturedTalent);
+router.get("/featured-talents", getFeaturedTalents);
+router.delete("/featured-talents/:id", deleteFeaturedTalent);
+router.put("/featured-talents/:id", uploadFeaturedImages, updateFeaturedTalent);
 
-//------------------done -------------------------------------
+// ------------------- Testimonial Routes ------------------------
 router.post("/testimonials", uploadTestimonialImg, addTestimonial);
 router.get("/testimonials", getTestimonials);
 router.delete("/testimonials/:id", deleteTestimonial);
 router.put("/testimonials/:id", uploadTestimonialImg, updateTestimonial);
 
-//------------------done ----------------------------------------
-
-router.get("/plan-detail", getPlandetail);
-router.put("/plan-detail", updatePlandetail);
+// ------------------- Plan Detail Routes ------------------------
+router.get("/plan-details", getPlandetail);
+router.put("/plan-details", updatePlandetail);
 
 module.exports = router;

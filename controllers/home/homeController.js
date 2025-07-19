@@ -585,6 +585,89 @@ const getCategories = async (req, res) => {
   }
 };
 
+const updateCategory = async (req, res) => {
+  const { id } = req.params;
+  const { title, talent_count, description, gender } = req.body;
+  const avatar = req.file ? req.file.filename : null;
+
+  if (!title || !gender) {
+    return res.status(400).json({ message: "Title and gender are required" });
+  }
+
+  try {
+    // 1. Check if category exists
+    const [existingCategory] = await pool.query(
+      "SELECT avatar FROM popular_categories WHERE id = ?",
+      [id]
+    );
+
+    if (existingCategory.length === 0) {
+      return res.status(404).json({ message: "Category not found" });
+    }
+
+    // 2. Prepare update data
+    let updateFields = {
+      title,
+      talent_count: talent_count || 0,
+      description: description || null,
+      gender
+    };
+
+    let updateQuery = "UPDATE popular_categories SET title = ?, talent_count = ?, description = ?, gender = ?";
+    const queryParams = [title, talent_count || 0, description, gender];
+
+    // 3. Handle avatar update if new file was uploaded
+    if (avatar) {
+      updateQuery += ", avatar = ?";
+      queryParams.push(avatar);
+
+      // Delete old avatar file
+      const oldAvatar = existingCategory[0].avatar;
+      const oldAvatarPath = path.join(
+        __dirname,
+        "../../uploads/categoryImg",
+        oldAvatar
+      );
+
+      if (fs.existsSync(oldAvatarPath)) {
+        fs.unlinkSync(oldAvatarPath);
+      }
+    }
+
+    updateQuery += " WHERE id = ?";
+    queryParams.push(id);
+
+    // 4. Execute update
+    await pool.query(updateQuery, queryParams);
+
+    // 5. Prepare response
+    const responseData = {
+      id,
+      title,
+      talent_count: talent_count || 0,
+      description,
+      gender
+    };
+
+    if (avatar) {
+      responseData.avatarUrl = `${req.protocol}://${req.get(
+        "host"
+      )}/uploads/categoryImg/${avatar}`;
+    } else {
+      responseData.avatarUrl = `${req.protocol}://${req.get(
+        "host"
+      )}/uploads/categoryImg/${existingCategory[0].avatar}`;
+    }
+
+    res.status(200).json({
+      message: "Category updated successfully",
+      category: responseData,
+    });
+  } catch (err) {
+    console.error("Update Category Error:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
 const deleteCategory = async (req, res) => {
   const { id } = req.params;
 
@@ -1315,4 +1398,5 @@ module.exports = {
   updatePlandetail,
   updateTestimonial,
   updateFeaturedTalent,
+  updateCategory,
 };
