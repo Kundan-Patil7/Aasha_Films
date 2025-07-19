@@ -758,14 +758,14 @@ const addFeaturedTalent = async (req, res) => {
       `);
     }
 
-    const [reactTable] = await pool.query(`
+    const [FeaturedTalentTable] = await pool.query(`
       SELECT COUNT(*) AS count FROM information_schema.tables 
-      WHERE table_schema = DATABASE() AND table_name = 'react'
+      WHERE table_schema = DATABASE() AND table_name = 'FeaturedTalent'
     `);
 
-    if (reactTable[0].count === 0) {
+    if (FeaturedTalentTable[0].count === 0) {
       await pool.query(`
-        CREATE TABLE react (
+        CREATE TABLE FeaturedTalent (
           id INT AUTO_INCREMENT PRIMARY KEY,
           info TEXT,
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -811,8 +811,8 @@ const addFeaturedTalent = async (req, res) => {
       image3Url: image3 ? `${baseUrl}${image3}` : null,
     };
 
-    // Log to react table
-    await pool.query("INSERT INTO react (info) VALUES (?)", [
+    // Log to FeaturedTalent table
+    await pool.query("INSERT INTO FeaturedTalent (info) VALUES (?)", [
       `Added featured talent: ${name}`,
     ]);
 
@@ -974,7 +974,7 @@ const updateFeaturedTalent = async (req, res) => {
     };
 
     // Log update
-    await pool.query("INSERT INTO react (info) VALUES (?)", [
+    await pool.query("INSERT INTO FeaturedTalent (info) VALUES (?)", [
       `Updated featured talent: ${name} (ID: ${id})`,
     ]);
 
@@ -1042,7 +1042,7 @@ const deleteFeaturedTalent = async (req, res) => {
     });
 
     // Log deletion
-    await pool.query("INSERT INTO react (info) VALUES (?)", [
+    await pool.query("INSERT INTO FeaturedTalent (info) VALUES (?)", [
       `Deleted featured talent: ${talentName} (ID: ${id})`,
     ]);
 
