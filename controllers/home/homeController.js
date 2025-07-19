@@ -634,19 +634,24 @@ const addFeaturedTalent = async (req, res) => {
     shoe_size,
     eye_color,
   } = req.body;
-  const profile_img = req.file ? req.file.filename : null;
+
+  // Handle multiple image uploads
+  const profile_img = req.files?.profile_img?.[0]?.filename || null;
+  const image1 = req.files?.image1?.[0]?.filename || null;
+  const image2 = req.files?.image2?.[0]?.filename || null;
+  const image3 = req.files?.image3?.[0]?.filename || null;
 
   if (!name || !gender || !profile_img) {
-    return res.status(400).json({ message: "Required fields missing" });
+    return res
+      .status(400)
+      .json({ message: "Name, gender and profile image are required" });
   }
 
   try {
-    // 1. Check if featured_talents table exists
+    // Check and create tables if needed
     const [talentTable] = await pool.query(`
-      SELECT COUNT(*) AS count
-      FROM information_schema.tables
-      WHERE table_schema = DATABASE()
-      AND table_name = 'featured_talents'
+      SELECT COUNT(*) AS count FROM information_schema.tables 
+      WHERE table_schema = DATABASE() AND table_name = 'featured_talents'
     `);
 
     if (talentTable[0].count === 0) {
@@ -661,18 +666,18 @@ const addFeaturedTalent = async (req, res) => {
           hair_color VARCHAR(50),
           shoe_size VARCHAR(50),
           eye_color VARCHAR(50),
-          profile_img VARCHAR(255),
+          profile_img VARCHAR(255) NOT NULL,
+          image1 VARCHAR(255),
+          image2 VARCHAR(255),
+          image3 VARCHAR(255),
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
       `);
     }
 
-    // 2. Check if react table exists
     const [reactTable] = await pool.query(`
-      SELECT COUNT(*) AS count
-      FROM information_schema.tables
-      WHERE table_schema = DATABASE()
-      AND table_name = 'react'
+      SELECT COUNT(*) AS count FROM information_schema.tables 
+      WHERE table_schema = DATABASE() AND table_name = 'react'
     `);
 
     if (reactTable[0].count === 0) {
@@ -685,11 +690,11 @@ const addFeaturedTalent = async (req, res) => {
       `);
     }
 
-    // 3. Insert featured talent
+    // Insert new talent
     const insertQuery = `
       INSERT INTO featured_talents 
-      (name, gender, age, location, height, hair_color, shoe_size, eye_color, profile_img)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      (name, gender, age, location, height, hair_color, shoe_size, eye_color, profile_img, image1, image2, image3)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
     await pool.query(insertQuery, [
       name,
@@ -701,30 +706,36 @@ const addFeaturedTalent = async (req, res) => {
       shoe_size,
       eye_color,
       profile_img,
+      image1,
+      image2,
+      image3,
     ]);
 
-    const talentUrl = `${req.protocol}://${req.get(
-      "host"
-    )}/uploads/featuredImg/${profile_img}`;
+    // Prepare response with image URLs
+    const baseUrl = `${req.protocol}://${req.get("host")}/uploads/featuredImg/`;
+    const responseData = {
+      name,
+      gender,
+      age,
+      location,
+      height,
+      hair_color,
+      shoe_size,
+      eye_color,
+      profileUrl: `${baseUrl}${profile_img}`,
+      image1Url: image1 ? `${baseUrl}${image1}` : null,
+      image2Url: image2 ? `${baseUrl}${image2}` : null,
+      image3Url: image3 ? `${baseUrl}${image3}` : null,
+    };
 
-    // Optional: Add entry to react log
+    // Log to react table
     await pool.query("INSERT INTO react (info) VALUES (?)", [
       `Added featured talent: ${name}`,
     ]);
 
     res.status(201).json({
       message: "Featured talent added successfully",
-      talent: {
-        name,
-        gender,
-        age,
-        location,
-        height,
-        hair_color,
-        shoe_size,
-        eye_color,
-        profileUrl: talentUrl,
-      },
+      talent: responseData,
     });
   } catch (err) {
     console.error("Add Talent Error:", err);
@@ -735,13 +746,16 @@ const addFeaturedTalent = async (req, res) => {
 const getFeaturedTalents = async (req, res) => {
   try {
     const [data] = await pool.query(
-      "SELECT * FROM featured_talents ORDER BY id DESC"
+      "SELECT * FROM featured_talents ORDER BY created_at DESC"
     );
 
     const baseUrl = `${req.protocol}://${req.get("host")}/uploads/featuredImg/`;
     const talentsWithUrls = data.map((talent) => ({
       ...talent,
       profileUrl: `${baseUrl}${talent.profile_img}`,
+      image1Url: talent.image1 ? `${baseUrl}${talent.image1}` : null,
+      image2Url: talent.image2 ? `${baseUrl}${talent.image2}` : null,
+      image3Url: talent.image3 ? `${baseUrl}${talent.image3}` : null,
     }));
 
     res.status(200).json(talentsWithUrls);
@@ -751,51 +765,207 @@ const getFeaturedTalents = async (req, res) => {
   }
 };
 
+const updateFeaturedTalent = async (req, res) => {
+  const { id } = req.params;
+  const {
+    name,
+    gender,
+    age,
+    location,
+    height,
+    hair_color,
+    shoe_size,
+    eye_color,
+  } = req.body;
+
+  // Handle multiple image uploads
+  const profile_img = req.files?.profile_img?.[0]?.filename || null;
+  const image1 = req.files?.image1?.[0]?.filename || null;
+  const image2 = req.files?.image2?.[0]?.filename || null;
+  const image3 = req.files?.image3?.[0]?.filename || null;
+
+  if (!name || !gender) {
+    return res.status(400).json({ message: "Name and gender are required" });
+  }
+
+  try {
+    // Get existing talent data
+    const [existingTalent] = await pool.query(
+      "SELECT profile_img, image1, image2, image3 FROM featured_talents WHERE id = ?",
+      [id]
+    );
+
+    if (existingTalent.length === 0) {
+      return res.status(404).json({ message: "Talent not found" });
+    }
+
+    // Prepare update data
+    const updateFields = {
+      name,
+      gender,
+      age: age || null,
+      location: location || null,
+      height: height || null,
+      hair_color: hair_color || null,
+      shoe_size: shoe_size || null,
+      eye_color: eye_color || null,
+    };
+
+    // Handle image updates and deletions
+    const imagesFolder = path.join(__dirname, "../../uploads/featuredImg/");
+    const oldImages = existingTalent[0];
+
+    const updateImage = (fieldName, newFilename) => {
+      if (newFilename) {
+        updateFields[fieldName] = newFilename;
+        // Delete old image if it exists
+        if (oldImages[fieldName]) {
+          const oldPath = path.join(imagesFolder, oldImages[fieldName]);
+          if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
+        }
+      }
+    };
+
+    updateImage("profile_img", profile_img);
+    updateImage("image1", image1);
+    updateImage("image2", image2);
+    updateImage("image3", image3);
+
+    // Build and execute update query
+    const updateQuery = `
+      UPDATE featured_talents SET
+        name = ?,
+        gender = ?,
+        age = ?,
+        location = ?,
+        height = ?,
+        hair_color = ?,
+        shoe_size = ?,
+        eye_color = ?,
+        profile_img = ?,
+        image1 = ?,
+        image2 = ?,
+        image3 = ?
+      WHERE id = ?
+    `;
+
+    await pool.query(updateQuery, [
+      updateFields.name,
+      updateFields.gender,
+      updateFields.age,
+      updateFields.location,
+      updateFields.height,
+      updateFields.hair_color,
+      updateFields.shoe_size,
+      updateFields.eye_color,
+      updateFields.profile_img || oldImages.profile_img,
+      updateFields.image1 || oldImages.image1,
+      updateFields.image2 || oldImages.image2,
+      updateFields.image3 || oldImages.image3,
+      id,
+    ]);
+
+    // Prepare response
+    const baseUrl = `${req.protocol}://${req.get("host")}/uploads/featuredImg/`;
+    const responseData = {
+      id,
+      ...updateFields,
+      profileUrl: `${baseUrl}${
+        updateFields.profile_img || oldImages.profile_img
+      }`,
+      image1Url: updateFields.image1
+        ? `${baseUrl}${updateFields.image1}`
+        : oldImages.image1
+        ? `${baseUrl}${oldImages.image1}`
+        : null,
+      image2Url: updateFields.image2
+        ? `${baseUrl}${updateFields.image2}`
+        : oldImages.image2
+        ? `${baseUrl}${oldImages.image2}`
+        : null,
+      image3Url: updateFields.image3
+        ? `${baseUrl}${updateFields.image3}`
+        : oldImages.image3
+        ? `${baseUrl}${oldImages.image3}`
+        : null,
+    };
+
+    // Log update
+    await pool.query("INSERT INTO react (info) VALUES (?)", [
+      `Updated featured talent: ${name} (ID: ${id})`,
+    ]);
+
+    res.status(200).json({
+      message: "Talent updated successfully",
+      talent: responseData,
+    });
+  } catch (err) {
+    console.error("Update Talent Error:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
 const deleteFeaturedTalent = async (req, res) => {
   const { id } = req.params;
 
   try {
-    const [rows] = await pool.query(
-      "SELECT profile_img FROM featured_talents WHERE id = ?",
+    // Get talent data including all images
+    const [talent] = await pool.query(
+      "SELECT name, profile_img, image1, image2, image3 FROM featured_talents WHERE id = ?",
       [id]
     );
 
-    if (rows.length === 0) {
+    if (talent.length === 0) {
       return res.status(404).json({ message: "Talent not found" });
     }
 
-    const profileImg = rows[0].profile_img;
-    const folderPath = path.join(__dirname, "../../uploads/featuredImg/");
-    const fullImgPath = path.join(folderPath, profileImg);
+    const talentName = talent[0].name;
+    const imagesFolder = path.join(__dirname, "../../uploads/featuredImg/");
 
-    // 1. Delete talent from DB
+    // Delete all associated images
+    const deleteImage = (filename) => {
+      if (filename) {
+        const filePath = path.join(imagesFolder, filename);
+        if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+      }
+    };
+
+    deleteImage(talent[0].profile_img);
+    deleteImage(talent[0].image1);
+    deleteImage(talent[0].image2);
+    deleteImage(talent[0].image3);
+
+    // Delete talent record
     await pool.query("DELETE FROM featured_talents WHERE id = ?", [id]);
 
-    // 2. Delete image file
-    if (fs.existsSync(fullImgPath)) {
-      fs.unlinkSync(fullImgPath);
-    }
-
-    // 3. Clean orphaned images in folder
+    // Clean up any orphaned images in the folder
     const [usedImages] = await pool.query(
-      "SELECT profile_img FROM featured_talents"
+      "SELECT profile_img, image1, image2, image3 FROM featured_talents"
     );
-    const usedFilenames = usedImages.map((item) => item.profile_img);
+    const usedFilenames = [];
+    usedImages.forEach((item) => {
+      if (item.profile_img) usedFilenames.push(item.profile_img);
+      if (item.image1) usedFilenames.push(item.image1);
+      if (item.image2) usedFilenames.push(item.image2);
+      if (item.image3) usedFilenames.push(item.image3);
+    });
 
-    fs.readdirSync(folderPath).forEach((file) => {
+    fs.readdirSync(imagesFolder).forEach((file) => {
       if (!usedFilenames.includes(file)) {
-        const filePath = path.join(folderPath, file);
+        const filePath = path.join(imagesFolder, file);
         fs.unlinkSync(filePath);
         console.log(`Deleted orphan image: ${file}`);
       }
     });
 
-    // Optional: log in react table
+    // Log deletion
     await pool.query("INSERT INTO react (info) VALUES (?)", [
-      `Deleted featured talent ID: ${id}`,
+      `Deleted featured talent: ${talentName} (ID: ${id})`,
     ]);
 
-    res.status(200).json({ message: "Talent and image deleted successfully" });
+    res
+      .status(200)
+      .json({ message: "Talent and all images deleted successfully" });
   } catch (err) {
     console.error("Delete Talent Error:", err);
     res.status(500).json({ message: "Server error" });
@@ -932,7 +1102,9 @@ const updateTestimonial = async (req, res) => {
   const avatar = req.file ? req.file.filename : null;
 
   if (!name || !description) {
-    return res.status(400).json({ message: "Name and description are required" });
+    return res
+      .status(400)
+      .json({ message: "Name and description are required" });
   }
 
   try {
@@ -953,7 +1125,8 @@ const updateTestimonial = async (req, res) => {
       them: them || 1,
     };
 
-    let updateQuery = "UPDATE testimonials SET name = ?, description = ?, them = ?";
+    let updateQuery =
+      "UPDATE testimonials SET name = ?, description = ?, them = ?";
     const queryParams = [name, description, them || 1];
 
     // 3. Handle avatar update if new file was uploaded
@@ -1140,5 +1313,6 @@ module.exports = {
   deleteTestimonial,
   getPlandetail,
   updatePlandetail,
-  updateTestimonial
+  updateTestimonial,
+  updateFeaturedTalent,
 };

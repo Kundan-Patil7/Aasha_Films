@@ -25,14 +25,16 @@ const {
   getPlandetail,
   updatePlandetail,
   updateTestimonial,
+  updateFeaturedTalent,
 } = require("../controllers/home/homeController");
 
 // Middleware
 const uploadHomeVideo = require("../middleware/uploadHomeVideo");
 const { bannerUpload } = require("../middleware/bannerUpload");
 const uploadAvatar = require("../middleware/categoryMiddleware");
-const uploadFeaturedImg = require("../middleware/uploadFeaturedImg");
+// const uploadFeaturedImg = require("../middleware/uploadFeaturedImg");
 const uploadTestimonialImg = require("../middleware/testimonialImg");
+const uploadFeaturedImages = require("../middleware/uploadFeaturedImg");
 
 // GET Routes
 router.get("/about-us", getAboutUs);
@@ -61,6 +63,7 @@ router.delete("/category/:id", deleteCategory);
 router.post("/featured", uploadFeaturedImg, addFeaturedTalent);
 router.get("/featured", getFeaturedTalents);
 router.delete("/featured/:id", deleteFeaturedTalent);
+router.put("/featured/:id", uploadFeaturedImages, updateFeaturedTalent);
 
 //------------------done -------------------------------------
 router.post("/testimonials", uploadTestimonialImg, addTestimonial);

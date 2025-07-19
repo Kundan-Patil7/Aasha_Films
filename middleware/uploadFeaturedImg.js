@@ -10,17 +10,24 @@ const storage = multer.diskStorage({
   }
 });
 
-const uploadFeaturedImg = multer({
-  storage,
-  limits: { fileSize: 2 * 1024 * 1024 }, // 2MB
-  fileFilter: (req, file, cb) => {
-    const ext = path.extname(file.originalname).toLowerCase();
-    if ([".jpg", ".jpeg", ".png", ".webp"].includes(ext)) {
-      cb(null, true);
-    } else {
-      cb(new Error("Only images are allowed"));
-    }
+const fileFilter = (req, file, cb) => {
+  const ext = path.extname(file.originalname).toLowerCase();
+  if ([".jpg", ".jpeg", ".png", ".webp"].includes(ext)) {
+    cb(null, true);
+  } else {
+    cb(new Error("Only images are allowed"), false);
   }
-}).single("profile_img");
+};
 
-module.exports = uploadFeaturedImg;
+const uploadFeaturedImages = multer({
+  storage,
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB per file
+  fileFilter
+}).fields([
+  { name: "profile_img", maxCount: 1 },
+  { name: "image1", maxCount: 1 },
+  { name: "image2", maxCount: 1 },
+  { name: "image3", maxCount: 1 }
+]);
+
+module.exports = uploadFeaturedImages;
